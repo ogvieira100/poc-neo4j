@@ -1,0 +1,9 @@
+criando o docker
+
+criando a rede
+docker network create neo4j-network --driver bridge
+criando o volume
+docker volume create neo4j-data
+
+criando container 
+docker run --name neo4j  -p 7474:7474 -p 7687:7687  -d   --network neo4j-network   -v neo4j-data:/data   -e NEO4J_AUTH=neo4j/Ann@julia2010   neo4j:latest
