@@ -20,6 +20,41 @@ namespace Api.Controllers
             _unitOfWork = unitOfWork;   
         }
 
+        [HttpPut]
+        public async Task<IActionResult> Update([FromBody] Person person)
+        {
+            try
+            {
+                var query = "MATCH (n:Person {id: $id}) SET n.name =  $name, n.surname = $surname, n.age= $age, n.address= $address, n.salary= $salary, n.weight= $weight, n.historia= $historia, n.dateOfBirth= $dateOfBirth  RETURN n ";
+                var parameters =
+                 new
+                 {
+                     id = person.Id.ToString(),
+                     name = person.Name,
+                     surname = person.SurName,
+                     age = person.Age,
+                     address = person.Address,
+                     salary = person.Salary,
+                     weight = person.Weight,
+                     historia = person.Historia,
+                     dateOfBirth = person.DateOfBirth
+                 };
+                var result = await _unitOfWork.ExecuteQueryAsync(query, parameters);
+                while (await result.FetchAsync())
+                {
+                    var node = result.Current["n"].As<INode>();
+                    Console.WriteLine($"Updated node: {node["name"]} {node["surname"]}, Age: {node["age"]}, Address: {node["address"]}, Salary: {node["salary"]}, Weight: {node["weight"]}, History: {node["historia"]}, DateOfBirth: {node["dateOfBirth"]}");
+                    return Ok(new { id = node["id"], name = node["name"], surname = node["surname"], age = node["age"], address = node["address"], salary = node["salary"], weight = node["weight"], historia = node["historia"], dateOfBirth = node["dateOfBirth"] });
+                }
+                
+            }
+            catch (Exception e)
+            {
+                return BadRequest(e);
+            }
+            return BadRequest();
+        }
+
         [HttpDelete("DeleteById/{id:guid}")]
         public async Task<IActionResult> DeleteById([FromRoute] Guid id)
         {
