@@ -1,6 +1,6 @@
 ﻿namespace Api.Data
 {
-    public class UnitOfWork
+    public class RepositoryConsult
     {
     }
 }
