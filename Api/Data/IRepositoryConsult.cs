@@ -1,4 +1,5 @@
-﻿using System.Linq.Expressions;
+﻿using Neo4j.Driver;
+using System.Linq.Expressions;
 
 namespace Api.Data
 {
@@ -7,5 +8,8 @@ namespace Api.Data
         Task<IEnumerable<TEntity>> SearchAsync(Expression<Func<TEntity, bool>> predicate);
         Task<TEntity> GetByIdAsync(Guid id);
         Task<IEnumerable<TEntity>> GetAllAsync();
+        Task ExecuteQueryAsync(string query,
+                                    object? parameters = null,
+                                    Action<IResultCursor>? action = null);
     }
 }

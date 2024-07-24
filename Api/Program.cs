@@ -23,6 +23,10 @@ builder.Services.AddSwaggerGen();
 //IUnitOfWork
 
 builder.Services.AddScoped<IUnitOfWork, Neo4jConnection>();
+builder.Services.AddScoped(typeof(IRepositoryConsult<>), typeof(RepositoryConsult<>));
+builder.Services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
+builder.Services.AddScoped<IContextDb, ContextDb>();
+//IContextDb
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

@@ -1,20 +1,21 @@
-﻿namespace Api.Models
-{
-    public class Customer
-    {
-        public Guid Id { get; set; }
-        public string Name { get; set; }
-        public string SurName { get; set; }
-        public int Age { get; set; }
-        public string Address { get; set; }
-        public decimal Salary { get; set; }
-        public double Weight { get; set; }
-        public DateTime DateOfBirth { get; set; }
-        public string HIstory { get; set; }
+﻿using Api.Data;
+using Newtonsoft.Json;
 
+namespace Api.Models
+{
+    public class Customer:EntityDataBase
+    {
+        public string name { get; set; }
+        public string surName { get; set; }
+        public int age { get; set; }
+        public string address { get; set; }
+        public decimal salary { get; set; }
+        public double weight { get; set; }
+        public DateTime dateOfBirth { get; set; }
+        public string history { get; set; }
         public Customer()
         {
-            Id = Guid.NewGuid();
+            id = Guid.NewGuid().ToString();
         }
     }
 }
