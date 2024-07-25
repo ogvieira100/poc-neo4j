@@ -9,8 +9,8 @@ namespace Api.Data
          Task UpdateAsync(TEntity customer, IEnumerable<string> fieldsUpdate);
          Task RemoveAsync(TEntity customer);
          IRepositoryConsult<TEntity> RepositoryConsult { get; }
-         Task ExecuteQueryAsync(string query,
-                                object? parameters = null,
-                                Action<IResultCursor>? action = null);
+        Task ExecuteQueryAsync(string query,
+                            object? parameters = null,
+                            Func<IResultCursor, Task>? action = null);
     }
 }

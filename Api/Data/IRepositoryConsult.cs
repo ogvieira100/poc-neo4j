@@ -9,7 +9,7 @@ namespace Api.Data
         Task<TEntity> GetByIdAsync(Guid id);
         Task<IEnumerable<TEntity>> GetAllAsync();
         Task ExecuteQueryAsync(string query,
-                                    object? parameters = null,
-                                    Action<IResultCursor>? action = null);
+                               object? parameters = null,
+                               Func<IResultCursor, Task>? action = null);
     }
 }

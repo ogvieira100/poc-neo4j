@@ -1,6 +1,7 @@
 ﻿using Api.Util;
 using Neo4j.Driver;
 using System.Linq.Expressions;
+using System.Reflection;
 
 namespace Api.Data
 {
@@ -17,13 +18,13 @@ namespace Api.Data
 
         public async Task ExecuteQueryAsync(string query,
                                     object? parameters = null,
-                                    Action<IResultCursor>? action = null)
+                                   Func<IResultCursor, Task>? action = null)
         {
             var session = _contextDb.Driver.AsyncSession();
             try
             {
                 var cursor = await session.RunAsync(query, parameters);
-                action?.Invoke(cursor);
+                await action?.Invoke(cursor);
             }
             catch (Exception e)
             {
@@ -39,30 +40,92 @@ namespace Api.Data
         public async Task<IEnumerable<TEntity>> GetAllAsync()
         {
             var listReturn = new List<TEntity>();
-            var query = $" MATCH (n:{nameof(TEntity).ToLower()}) RETURN n ";
             var instance = Activator.CreateInstance(typeof(TEntity)) as TEntity;
             var type = instance?.GetType();
+            var query = $" MATCH (n:{type.Name.ToLower()}) RETURN n ";
+
+
             var props = type?.GetProperties();
 
             await ExecuteQueryAsync(query, null, async (cursor) =>
             {
-                await foreach (var record in cursor)
+                var listRecord = await cursor.ToListAsync();
+                if (listRecord != null)
                 {
-                    var node = record["n"].As<INode>();
-                    if (props != null && props.Any())
+                    foreach (var record in listRecord)
                     {
-                        var instance = Activator.CreateInstance(typeof(TEntity)) as TEntity;
-                        foreach (var prop in props)
+                        var node = record["n"].As<INode>();
+                        if (props != null && props.Any())
                         {
-                            node.TryGet<object>(prop.Name.ToLower(), out var res);
-                            if (res != null)
-                                prop.SetValue(instance, res);
+                            var instance = Activator.CreateInstance(typeof(TEntity)) as TEntity;
+                            foreach (var prop in props)
+                            {
+                                TratarClasseNodes(node, instance, prop);
+
+                            }
+                            listReturn.Add(instance);
                         }
-                        listReturn.Add(instance);
                     }
                 }
             });
             return listReturn;
+        }
+
+        void TratarClasseNodes(INode node, TEntity? instance, PropertyInfo prop)
+        {
+            node.TryGet<object>(prop.Name, out var res);
+            if (res != null)
+            {
+                if (prop.PropertyType == typeof(Int32))
+                {
+                    if (Int32.TryParse(res.ToString(), out var resConv))
+                    {
+                        prop.SetValue(instance, resConv);
+                    }
+                }
+                else if (prop.PropertyType == typeof(Int32?))
+                {
+                    if (Int32.TryParse(res.ToString(), out var resConv))
+                    {
+                        prop.SetValue(instance, resConv);
+                    }
+                }
+                else if (prop.PropertyType == typeof(decimal))
+                {
+                    if (Decimal.TryParse(res.ToString(), out var resConv))
+                    {
+                        prop.SetValue(instance, resConv);
+                    }
+                }
+                else if (prop.PropertyType == typeof(decimal?))
+                {
+                    if (Decimal.TryParse(res.ToString(), out var resConv))
+                    {
+                        prop.SetValue(instance, resConv);
+                    }
+                }
+                else if (prop.PropertyType == typeof(DateTime))
+                {
+                    var dateNeo = res as Neo4j.Driver.ZonedDateTime;
+                    if (dateNeo != null)
+                    {
+                        prop.SetValue(instance, UtilClass.ConvertZonedDateTimeToDateTime(dateNeo));
+                    }
+                }
+                else if (prop.PropertyType == typeof(DateTime?))
+                {
+                    var dateNeo = res as Neo4j.Driver.ZonedDateTime;
+                    if (dateNeo != null)
+                    {
+                        prop.SetValue(instance, UtilClass.ConvertZonedDateTimeToDateTime(dateNeo));
+                    }
+                }
+                else
+                {
+                    prop.SetValue(instance, res);
+                }
+
+            }
         }
 
         public async Task<TEntity> GetByIdAsync(Guid id)
@@ -70,7 +133,7 @@ namespace Api.Data
             var instance = Activator.CreateInstance(typeof(TEntity)) as TEntity;
             var type = instance?.GetType();
             var props = type?.GetProperties();
-            var query = " MATCH (n:" + nameof(TEntity).ToLower() + " {id: $id}) RETURN n ";
+            var query = " MATCH (n:" + type.Name.ToLower() + " {id: $id}) RETURN n ";
             var par = new { id = id.ToString() };
             await ExecuteQueryAsync(query, par, async (cursor) =>
             {
@@ -81,9 +144,7 @@ namespace Api.Data
                     {
                         foreach (var prop in props)
                         {
-                            node.TryGet<object>(prop.Name.ToLower(), out var res);
-                            if (res != null)
-                                prop.SetValue(instance, res);
+                            TratarClasseNodes(node, instance, prop);
                         }
                     }
                 }
@@ -93,12 +154,48 @@ namespace Api.Data
 
         public async Task<IEnumerable<TEntity>> SearchAsync(Expression<Func<TEntity, bool>> predicate)
         {
-
+            var listSearch = new List<TEntity>();
             var conditions = UtilClass.ExtractConditions(predicate);
-           
-            var query = "";
+            if (conditions != null && conditions.Any())
+            {
+                var instance = Activator.CreateInstance(typeof(TEntity)) as TEntity;
+                var type = instance?.GetType();
+                var props = type?.GetProperties();
+                /* unica expressão tratada == */
+                var condicionsRead = conditions.Where(x => x.Expressao == ExpressionType.Equal);
+                var queryConditional = "{";
+                foreach (var conditional in condicionsRead)
+                {
+                    queryConditional += conditional.Campo+": $"+ conditional.Campo+",";
+                    var prop =  props.FirstOrDefault(x => x.Name == conditional.Campo);
+                    prop.SetValue(instance, conditional.Valor);
+                }
+                queryConditional = queryConditional.Substring(0, queryConditional.Length - 1) + "}";
+                var query = " MATCH (n:" + type.Name.ToLower()+ queryConditional+ ") RETURN n ";
 
-            throw new NotImplementedException();
+                await ExecuteQueryAsync(query, instance, async (cursor) =>
+                {
+                    var listRecord = await cursor.ToListAsync();
+                    if (listRecord != null)
+                    {
+                        foreach (var record in listRecord)
+                        {
+                            var node = record["n"].As<INode>();
+                            if (props != null && props.Any())
+                            {
+                                var instance = Activator.CreateInstance(typeof(TEntity)) as TEntity;
+                                foreach (var prop in props)
+                                {
+                                    TratarClasseNodes(node, instance, prop);
+
+                                }
+                                listSearch.Add(instance);
+                            }
+                        }
+                    }
+                });
+            }
+            return listSearch;
         }
     }
 }
