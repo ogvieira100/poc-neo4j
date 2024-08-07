@@ -14,6 +14,21 @@ namespace Api.Data
             _contextDb = contextDb;
         }
 
+        IDictionary<string, object?> Parametros<TValue>(TValue value) where TValue : class
+        {
+            var dictionary = new Dictionary<string, object?>();
+            var typeValue = value.GetType();
+            var propertyInfos = typeValue.GetProperties().ToList();
+            // parameters.Add($"name_{i}", person.Name);
+            /*padrão posição da propriedade com _0, _1*/
+            foreach (var propertyInfo in propertyInfos)
+            {
+                var indexOf = propertyInfos.IndexOf(propertyInfo);
+                dictionary.Add($"{GetPropJsonAttr(propertyInfo)}_{indexOf}", propertyInfo.GetValue(value));
+            }
+            return dictionary;
+        }
+
         string GetPropJsonAttr(PropertyInfo propertyInfo)
         {
             var jsonPropertyAttribute = propertyInfo.GetCustomAttributes(typeof(JsonPropertyAttribute), false)

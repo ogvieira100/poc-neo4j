@@ -9,34 +9,49 @@ using System.Text.Json.Serialization;
 
 namespace Api.Data
 {
-    public class BaseRepository<TEntity> 
+    public class BaseRepository<TEntity>
         : IBaseRepository<TEntity> where TEntity : EntityDataBase
     {
         readonly IContextDb _contextDb;
         public BaseRepository(IContextDb contextDb, IRepositoryConsult<TEntity> _repositoryConsult)
         {
             _contextDb = contextDb;
-            RepositoryConsult = _repositoryConsult; 
+            RepositoryConsult = _repositoryConsult;
         }
 
         public IRepositoryConsult<TEntity> RepositoryConsult { get; }
 
         string GetPropJsonAttr(PropertyInfo propertyInfo)
         {
-          var jsonPropertyAttribute =   propertyInfo.GetCustomAttributes(typeof(JsonPropertyAttribute), false)
-                                                    .FirstOrDefault() as JsonPropertyAttribute;
-          if (jsonPropertyAttribute == null)
+            var jsonPropertyAttribute = propertyInfo.GetCustomAttributes(typeof(JsonPropertyAttribute), false)
+                                                      .FirstOrDefault() as JsonPropertyAttribute;
+            if (jsonPropertyAttribute == null)
                 return propertyInfo.Name;
 
             return jsonPropertyAttribute.PropertyName!;
         }
 
-        public async Task AddColectionAsync(List<TEntity> entities )
+        IDictionary<string, object?> Parametros<TValue>(TValue value) where TValue : class
+        {
+            var dictionary = new Dictionary<string, object?>();
+            var typeValue = value.GetType();
+            var propertyInfos = typeValue.GetProperties().ToList();
+            // parameters.Add($"name_{i}", person.Name);
+            /*padrão posição da propriedade com _0, _1*/
+            foreach (var propertyInfo in propertyInfos)
+            {
+                var indexOf =  propertyInfos.IndexOf(propertyInfo);
+                dictionary.Add($"{GetPropJsonAttr(propertyInfo)}_{indexOf}", propertyInfo.GetValue(value));
+            }
+            return dictionary;
+        }
+
+        public async Task AddColectionAsync(List<TEntity> entities)
         {
             var queryBuilder = new StringBuilder();
             var parameters = new Dictionary<string, object?>();
             queryBuilder.AppendLine(" CREATE ");
-            var countEntities = 0; 
+            var countEntities = 0;
             for (int i = 0; i < entities.Count(); i++)
             {
                 countEntities++;
@@ -50,9 +65,9 @@ namespace Api.Data
                     countProperts++;
                     parameters.Add($"{GetPropJsonAttr(property)}_{i}", property.GetValue(entity));
                     if (countProperts == propertyInfo.Count())
-                        queryBuilder.AppendLine(GetPropJsonAttr(property)   + ":" + "$" + GetPropJsonAttr(property)+"_"+i );
+                        queryBuilder.AppendLine(GetPropJsonAttr(property) + ":" + "$" + GetPropJsonAttr(property) + "_" + i);
                     else
-                        queryBuilder.AppendLine(GetPropJsonAttr(property) + ": " + "$" + GetPropJsonAttr(property) + "_" + i + ","); 
+                        queryBuilder.AppendLine(GetPropJsonAttr(property) + ": " + "$" + GetPropJsonAttr(property) + "_" + i + ",");
                 }
                 if (countEntities == entities.Count())
                     queryBuilder.AppendLine("})");
@@ -61,7 +76,8 @@ namespace Api.Data
             }
             queryBuilder.AppendLine("RETURN *");
             string query = queryBuilder.ToString();
-            await ExecuteQueryAsync(query, parameters, async (cursor) => {
+            await ExecuteQueryAsync(query, parameters, async (cursor) =>
+            {
                 while (await cursor.FetchAsync())
                 {
                     await foreach (var record in cursor)
@@ -72,22 +88,37 @@ namespace Api.Data
                 }
             });
         }
+        IDictionary<string, object?> GetParams<TValue>(TValue value) where TValue : class
+        {
+            var dictionary = new Dictionary<string, object?>();
+            var typeValue = value.GetType();
+            var propertyInfos = typeValue.GetProperties().ToList();
+            // parameters.Add($"name_{i}", person.Name);
+            /*padrão posição da propriedade com _0, _1*/
+            foreach (var propertyInfo in propertyInfos)
+            {
+                var indexOf = propertyInfos.IndexOf(propertyInfo);
+                dictionary.Add($"{GetPropJsonAttr(propertyInfo)}_{indexOf}", propertyInfo.GetValue(value));
+            }
+            return dictionary;
+        }
         public async Task AddAsync(TEntity entidade)
         {
             var type = entidade.GetType();
-            var query = $" CREATE (n:{type.Name}"+"{";
-            var props = type.GetProperties();
+            var query = $" CREATE (n:{type.Name}" + "{";
+            var props = type.GetProperties().ToList();
             foreach (var prop in props)
             {
-            
-               query += GetPropJsonAttr(prop) + ":" + "$" + GetPropJsonAttr(prop) + ",";
+                var indexOf = props.IndexOf(prop);
+                query += GetPropJsonAttr(prop) + ":" + "$" + GetPropJsonAttr(prop) + "_" + indexOf + ",";
             }
-            query = query.Substring(0, query.Length-1) + "}) RETURN n";
-            await ExecuteQueryAsync(query, entidade, async  (cursor) => {
+            query = query.Substring(0, query.Length - 1) + "}) RETURN n";
+            var parameters = GetParams(entidade);
+            await ExecuteQueryAsync(query, parameters, async (cursor) => {
                 while (await cursor.FetchAsync())
                 {
                     var node = cursor.Current["n"].As<INode>();
-                   // Console.WriteLine($"Created node: {node["name"]} {node["surname"]}, Age: {node["age"]}, Address: {node["address"]}, Salary: {node["salary"]}, Weight: {node["weight"]}, History: {node["historia"]}, DateOfBirth: {node["dateOfBirth"]}");
+                    // Console.WriteLine($"Created node: {node["name"]} {node["surname"]}, Age: {node["age"]}, Address: {node["address"]}, Salary: {node["salary"]}, Weight: {node["weight"]}, History: {node["historia"]}, DateOfBirth: {node["dateOfBirth"]}");
                 }
             });
         }
@@ -118,9 +149,10 @@ namespace Api.Data
         public async Task RemoveAsync(TEntity entidade)
         {
             var type = entidade.GetType();
-            var query = "MATCH (n:"+ type.Name+" {id: $id}) DELETE n";
-            await ExecuteQueryAsync(query, entidade, async (cursor) => {
-                while ( await cursor.FetchAsync())
+            var query = "MATCH (n:" + type.Name + " {id: $id}) DELETE n";
+            await ExecuteQueryAsync(query, entidade, async (cursor) =>
+            {
+                while (await cursor.FetchAsync())
                 {
                     var node = cursor.Current["n"].As<INode>();
                     // Console.WriteLine($"Created node: {node["name"]} {node["surname"]}, Age: {node["age"]}, Address: {node["address"]}, Salary: {node["salary"]}, Weight: {node["weight"]}, History: {node["historia"]}, DateOfBirth: {node["dateOfBirth"]}");
@@ -131,11 +163,12 @@ namespace Api.Data
         public async Task UpdateAsync(TEntity entidade, IEnumerable<string> fieldsUpdate)
         {
             var type = entidade.GetType();
-            var query = "MATCH (n:"+ type.Name +" {id: $id}) SET ";
-           
-            var props = type.GetProperties();
+            var query = "MATCH (n:" + type.Name + " {id: $id}) SET ";
+
+            var props = type.GetProperties().ToList();
             foreach (var prop in props)
             {
+                var indexOf = props.IndexOf(prop);
                 if (fieldsUpdate != null && fieldsUpdate.Any())
                 {
                     if (!fieldsUpdate.Contains(GetPropJsonAttr(prop)))
@@ -143,11 +176,12 @@ namespace Api.Data
                 }
                 if (GetPropJsonAttr(prop) == "id")
                     continue;
-                query += "n." + GetPropJsonAttr(prop) + " = " + "$" + GetPropJsonAttr(prop) + ",";
+                query += "n." + GetPropJsonAttr(prop) + " = " + "$" + GetPropJsonAttr(prop) + "_" + indexOf + ",";
             }
             query = query.Substring(0, query.Length - 1) + " RETURN n";
-            await ExecuteQueryAsync(query, entidade, async  (cursor) => {
-                while  ( await cursor.FetchAsync())
+            var parameters = GetParams(entidade);
+            await ExecuteQueryAsync(query, parameters, async (cursor) => {
+                while (await cursor.FetchAsync())
                 {
                     var node = cursor.Current["n"].As<INode>();
                     // Console.WriteLine($"Created node: {node["name"]} {node["surname"]}, Age: {node["age"]}, Address: {node["address"]}, Salary: {node["salary"]}, Weight: {node["weight"]}, History: {node["historia"]}, DateOfBirth: {node["dateOfBirth"]}");
