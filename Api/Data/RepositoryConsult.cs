@@ -1,5 +1,6 @@
 ﻿using Api.Util;
 using Neo4j.Driver;
+using Newtonsoft.Json;
 using System.Linq.Expressions;
 using System.Reflection;
 
@@ -11,6 +12,16 @@ namespace Api.Data
         public RepositoryConsult(IContextDb contextDb)
         {
             _contextDb = contextDb;
+        }
+
+        string GetPropJsonAttr(PropertyInfo propertyInfo)
+        {
+            var jsonPropertyAttribute = propertyInfo.GetCustomAttributes(typeof(JsonPropertyAttribute), false)
+                                                      .FirstOrDefault() as JsonPropertyAttribute;
+            if (jsonPropertyAttribute == null)
+                return propertyInfo.Name;
+
+            return jsonPropertyAttribute.PropertyName!;
         }
 
         public void Dispose() => GC.SuppressFinalize(this);
@@ -42,7 +53,7 @@ namespace Api.Data
             var listReturn = new List<TEntity>();
             var instance = Activator.CreateInstance(typeof(TEntity)) as TEntity;
             var type = instance?.GetType();
-            var query = $" MATCH (n:{type.Name.ToLower()}) RETURN n ";
+            var query = $" MATCH (n:{type.Name}) RETURN n ";
 
 
             var props = type?.GetProperties();
@@ -73,7 +84,7 @@ namespace Api.Data
 
         void TratarClasseNodes(INode node, TEntity? instance, PropertyInfo prop)
         {
-            node.TryGet<object>(prop.Name, out var res);
+            node.TryGet<object>(GetPropJsonAttr(prop), out var res);
             if (res != null)
             {
                 if (prop.PropertyType == typeof(Int32))
@@ -133,7 +144,7 @@ namespace Api.Data
             var instance = Activator.CreateInstance(typeof(TEntity)) as TEntity;
             var type = instance?.GetType();
             var props = type?.GetProperties();
-            var query = " MATCH (n:" + type.Name.ToLower() + " {id: $id}) RETURN n ";
+            var query = " MATCH (n:" + type.Name + " {id: $id}) RETURN n ";
             var par = new { id = id.ToString() };
             await ExecuteQueryAsync(query, par, async (cursor) =>
             {
@@ -171,7 +182,7 @@ namespace Api.Data
                     prop.SetValue(instance, conditional.Valor);
                 }
                 queryConditional = queryConditional.Substring(0, queryConditional.Length - 1) + "}";
-                var query = " MATCH (n:" + type.Name.ToLower()+ queryConditional+ ") RETURN n ";
+                var query = " MATCH (n:" + type.Name + queryConditional+ ") RETURN n ";
 
                 await ExecuteQueryAsync(query, instance, async (cursor) =>
                 {

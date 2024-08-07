@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Neo4j.Driver;
 using System;
 using System.Net;
+using System.Text;
 using System.Xml.Linq;
 
 namespace Api.Controllers
@@ -142,6 +143,50 @@ namespace Api.Controllers
             {
                 return BadRequest(e);
             }
+        }
+
+        [HttpPost("CreateAllPerson")]
+        public async Task<IActionResult> CreateAllPerson([FromBody] List<Person> persons)
+        {
+
+            try
+            {
+                var queryBuilder = new StringBuilder();
+                var parameters = new Dictionary<string, object>();
+
+                for (int i = 0; i < persons.Count(); i++)
+                {
+                    var person = persons[i];
+                    parameters.Add($"name_{i}", person.Name);
+                    parameters.Add($"age_{i}", person.Age);
+                    parameters.Add($"surname_{i}", person.SurName);
+                    parameters.Add($"address_{i}", person.Address);
+                    parameters.Add($"salary_{i}", person.Salary);
+                    parameters.Add($"weight_{i}", person.Weight);
+
+                    // Criar o nó Person
+                    queryBuilder.AppendLine($"CREATE (p{i}:Person {{name: $name_{i}, age: $age_{i}, surname: $surname_{i}, address: $address_{i}, salary: $salary_{i}, weight: $weight_{i}}})");
+                }
+                queryBuilder.AppendLine("RETURN *");
+
+                string query = queryBuilder.ToString();
+                var result = await _unitOfWork.ExecuteQueryAsync(query, parameters);
+                while (await result.FetchAsync())
+                {
+                    await foreach (var record in result)
+                    {
+                        // Processar o resultado conforme necessário
+                        Console.WriteLine(record);
+                    }
+                    
+                }
+                return Ok();    
+            }
+            catch (Exception e)
+            {
+                return BadRequest(e);
+            }
+            
         }
 
         [HttpPost]
