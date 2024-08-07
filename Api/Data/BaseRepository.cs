@@ -1,7 +1,10 @@
 ﻿
+using Api.Models;
 using Neo4j.Driver;
 using Newtonsoft.Json;
+using System;
 using System.Reflection;
+using System.Text;
 using System.Text.Json.Serialization;
 
 namespace Api.Data
@@ -28,7 +31,47 @@ namespace Api.Data
             return jsonPropertyAttribute.PropertyName!;
         }
 
-
+        public async Task AddColectionAsync(List<TEntity> entities )
+        {
+            var queryBuilder = new StringBuilder();
+            var parameters = new Dictionary<string, object?>();
+            queryBuilder.AppendLine(" CREATE ");
+            var countEntities = 0; 
+            for (int i = 0; i < entities.Count(); i++)
+            {
+                countEntities++;
+                var entity = entities[i];
+                var propertyInfo = entity.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public);
+                // Criar o nó Person
+                queryBuilder.AppendLine($" (e{i}:{entity.GetType().Name}" + " {");
+                var countProperts = 0;
+                foreach (var property in propertyInfo)
+                {
+                    countProperts++;
+                    parameters.Add($"{GetPropJsonAttr(property)}_{i}", property.GetValue(entity));
+                    if (countProperts == propertyInfo.Count())
+                        queryBuilder.AppendLine(GetPropJsonAttr(property)   + ":" + "$" + GetPropJsonAttr(property)+"_"+i );
+                    else
+                        queryBuilder.AppendLine(GetPropJsonAttr(property) + ": " + "$" + GetPropJsonAttr(property) + "_" + i + ","); 
+                }
+                if (countEntities == entities.Count())
+                    queryBuilder.AppendLine("})");
+                else
+                    queryBuilder.AppendLine("}),");
+            }
+            queryBuilder.AppendLine("RETURN *");
+            string query = queryBuilder.ToString();
+            await ExecuteQueryAsync(query, parameters, async (cursor) => {
+                while (await cursor.FetchAsync())
+                {
+                    await foreach (var record in cursor)
+                    {
+                        // Processar o resultado conforme necessário
+                        Console.WriteLine(record);
+                    }
+                }
+            });
+        }
         public async Task AddAsync(TEntity entidade)
         {
             var type = entidade.GetType();

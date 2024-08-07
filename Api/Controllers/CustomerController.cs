@@ -55,6 +55,12 @@ namespace Api.Controllers
             return Ok(customer);
         }
 
+        [HttpPost("CreateAllCustomer")]
+        public async Task<IActionResult> CreateAllCustomer([FromBody] IEnumerable<Customer> customers)
+        {
+            await _baseRepositoryCustomer.AddColectionAsync(customers.ToList());
+            return Ok();    
+        }
 
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] Customer customer)
