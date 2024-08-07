@@ -11,6 +11,6 @@ namespace Api.Data
          Task ExecuteQueryAsync(string query,
                             object? parameters = null,
                             Func<IResultCursor, Task>? action = null);
-        Task AddColectionAsync(List<TEntity> entities);
+         Task AddColectionAsync(List<TEntity> entities);
     }
 }
